@@ -1,0 +1,22 @@
+version = 1
+requires-python = ">=3.12"
+
+[[package]]
+name = "ignr"
+version = "2.2"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/cb/df/a3e6a5f702ad1e7901e20749d6e4efec9157a3da993111eb6a3ace9650d0/ignr-2.2.tar.gz", hash = "sha256:382a81be67a34538a11ff8ab69063419b388cc32f01b4ace599c3f1c06526df4", size = 4466 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/40/e8e8c621eb1aff111d79d8c3213072534bda9a9d76ba087db07cb17dc551/ignr-2.2-py3-none-any.whl", hash = "sha256:e8b6276aedab79b066d795e6e4b3f7b4c5668b68bf50a6c4fbf2b0cd17dda1db", size = 4309 },
+]
+
+[[package]]
+name = "trabalho-redes-final"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "ignr" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "ignr", specifier = ">=2.2" }]
