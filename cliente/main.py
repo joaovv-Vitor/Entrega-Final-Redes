@@ -51,6 +51,51 @@ def draw_ranking(rankings):
         screen.blit(text, (x_offset, y_offset))
         y_offset += 20  # Espaçamento entre os itens do ranking
 
+# Função para exibir a tela de inserção do nickname
+def get_nickname():
+    input_box = pygame.Rect(150, 200, 300, 32)
+    color_inactive = pygame.Color('lightskyblue3')
+    color_active = pygame.Color('dodgerblue2')
+    color = color_inactive
+    active = False
+    text = ''
+    nickname = None
+
+    while nickname is None:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                return None
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if input_box.collidepoint(event.pos):
+                    active = not active
+                else:
+                    active = False
+                color = color_active if active else color_inactive
+            if event.type == pygame.KEYDOWN:
+                if active:
+                    if event.key == pygame.K_RETURN:
+                        nickname = text
+                    elif event.key == pygame.K_BACKSPACE:
+                        text = text[:-1]
+                    else:
+                        text += event.unicode
+
+        screen.fill(WHITE)
+        txt_surface = font.render(text, True, color)
+        width = max(200, txt_surface.get_width() + 10)
+        input_box.w = width
+        screen.blit(txt_surface, (input_box.x + 5, input_box.y + 5))
+        pygame.draw.rect(screen, color, input_box, 2)
+
+        # Exibe a instrução
+        instruction = font.render("Digite seu nickname e pressione ENTER:", True, BLACK)
+        screen.blit(instruction, (input_box.x, input_box.y - 30))
+
+        pygame.display.flip()
+
+    return nickname
+
 # Função principal do cliente
 def main():
     # Conecta ao servidor
@@ -58,9 +103,13 @@ def main():
         client_socket.connect((HOST, PORT))
         print(f"Conectado ao servidor {HOST}:{PORT}")
 
-        # Recebe a solicitação do nickname
-        nickname_prompt = client_socket.recv(1024).decode()
-        nickname = input(nickname_prompt)
+        # Solicita o nickname na interface gráfica
+        client_socket.recv(1024).decode()
+        nickname = get_nickname()
+        if nickname is None:
+            return
+
+        # Envia o nickname para o servidor
         client_socket.sendall(nickname.encode())
 
         # Recebe o tabuleiro do servidor
@@ -105,8 +154,6 @@ def main():
                         print("Ranking:", rankings)
                         if "Palavra encontrada" in response:
                             selected_cells = []
-
-                    
 
             screen.fill(WHITE)
             draw_header(score, found_words)  # Desenha o cabeçalho
