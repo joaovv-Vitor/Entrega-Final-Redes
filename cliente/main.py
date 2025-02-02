@@ -103,6 +103,10 @@ def main():
                         rankings = progress["rankings"]
                         print(f"Pontuação: {score} | Palavras encontradas: {found_words}")
                         print("Ranking:", rankings)
+                        if "Palavra encontrada" in response:
+                            selected_cells = []
+
+                    
 
             screen.fill(WHITE)
             draw_header(score, found_words)  # Desenha o cabeçalho

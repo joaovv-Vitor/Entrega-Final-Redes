@@ -71,7 +71,16 @@ class ClientHandler(Thread):
                     self.conn.sendall(f"Palavra encontrada: {word}".encode())
 
                     # Atualiza o ranking
-                    rankings.append((self.nickname, self.score))
+                    updated = False
+                    for i, (name, old_score) in enumerate(rankings):
+                        if name == self.nickname:
+                            rankings[i] = (self.nickname, self.score)  # Atualiza a pontuação
+                            updated = True
+                            break
+
+                    if not updated:
+                        rankings.append((self.nickname, self.score))  # Adiciona novo jogador ao ranking
+
                     rankings.sort(key=lambda x: x[1], reverse=True)  # Ordena por score
                 else:
                     self.conn.sendall("Palavra não encontrada.".encode())
