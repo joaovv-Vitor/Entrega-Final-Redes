@@ -40,12 +40,28 @@ def draw_header(score, found_words):
     text = header_font.render(header_text, True, BLACK)
     screen.blit(text, (10, 10))
 
+# Função para desenhar o ranking
+def draw_ranking(rankings):
+    y_offset = 80  
+    x_offset = 420
+
+    for i, (name, score) in enumerate(rankings, start=1):
+        ranking_text = f"{i}. {name}: {score} pontos"
+        text = font.render(ranking_text, True, BLACK)
+        screen.blit(text, (x_offset, y_offset))
+        y_offset += 20  # Espaçamento entre os itens do ranking
+
 # Função principal do cliente
 def main():
     # Conecta ao servidor
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
         client_socket.connect((HOST, PORT))
         print(f"Conectado ao servidor {HOST}:{PORT}")
+
+        # Recebe a solicitação do nickname
+        nickname_prompt = client_socket.recv(1024).decode()
+        nickname = input(nickname_prompt)
+        client_socket.sendall(nickname.encode())
 
         # Recebe o tabuleiro do servidor
         board_data = client_socket.recv(4096).decode()
@@ -55,6 +71,7 @@ def main():
         selected_cells = []  # Células selecionadas pelo jogador
         found_words = []     # Lista de palavras encontradas pelo jogador
         score = 0            # Pontuação do jogador
+        rankings = []        # Lista de rankings recebida do servidor
         running = True
 
         while running:
@@ -78,16 +95,19 @@ def main():
                         response = client_socket.recv(1024).decode()
                         print("Resposta do servidor:", response)
 
-                        # Recebe a pontuação e a lista de palavras encontradas
+                        # Recebe a pontuação, a lista de palavras encontradas e o ranking
                         progress_data = client_socket.recv(1024).decode()
                         progress = eval(progress_data)
                         score = progress["score"]
                         found_words = progress["found_words"]
+                        rankings = progress["rankings"]
                         print(f"Pontuação: {score} | Palavras encontradas: {found_words}")
+                        print("Ranking:", rankings)
 
             screen.fill(WHITE)
             draw_header(score, found_words)  # Desenha o cabeçalho
             draw_board(board, selected_cells)  # Desenha o tabuleiro
+            draw_ranking(rankings)  # Desenha o ranking
             pygame.display.flip()
 
     pygame.quit()

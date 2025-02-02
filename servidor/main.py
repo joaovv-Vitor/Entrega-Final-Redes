@@ -11,6 +11,9 @@ PORT = 5000         # Porta do servidor
 ROWS, COLS = 10, 10
 WORDS = ["PYTHON", "JOGO", "PROGRAMA", "DIVERSÃO"]
 
+# Lista para armazenar os rankings (nickname, score)
+rankings = []
+
 # Função para gerar o tabuleiro
 def generate_board():
     board = [[random.choice(string.ascii_uppercase) for _ in range(COLS)] for _ in range(ROWS)]
@@ -28,11 +31,6 @@ def generate_board():
                 board[row + i][col] = letter
     return board
 
-# Função para verificar se a seleção forma uma palavra válida
-def check_word(board, selected_cells):
-    word = "".join([board[row][col] for row, col in selected_cells])
-    return word in WORDS
-
 # Classe para gerenciar cada cliente
 class ClientHandler(Thread):
     def __init__(self, conn, addr, board):
@@ -42,9 +40,15 @@ class ClientHandler(Thread):
         self.board = board
         self.found_words = []  # Lista de palavras encontradas pelo jogador
         self.score = 0         # Pontuação do jogador (palavras acertadas)
+        self.nickname = None   # Nickname do jogador
 
     def run(self):
         print(f"Novo cliente conectado: {self.addr}")
+
+        # Solicita o nickname do cliente
+        self.conn.sendall("Digite seu nickname: ".encode())
+        self.nickname = self.conn.recv(1024).decode().strip()
+        print(f"Cliente {self.addr} escolheu o nickname: {self.nickname}")
 
         # Envia o tabuleiro para o cliente
         self.conn.sendall(str(self.board).encode())
@@ -65,13 +69,18 @@ class ClientHandler(Thread):
                     self.found_words.append(word)
                     self.score += 1  # Incrementa a pontuação
                     self.conn.sendall(f"Palavra encontrada: {word}".encode())
+
+                    # Atualiza o ranking
+                    rankings.append((self.nickname, self.score))
+                    rankings.sort(key=lambda x: x[1], reverse=True)  # Ordena por score
                 else:
                     self.conn.sendall("Palavra não encontrada.".encode())
 
-                # Envia a pontuação e a lista de palavras encontradas para o cliente
+                # Envia a pontuação, a lista de palavras encontradas e o ranking para o cliente
                 response = {
                     "score": self.score,
-                    "found_words": self.found_words
+                    "found_words": self.found_words,
+                    "rankings": rankings[:10]  # Envia apenas os top 10
                 }
                 self.conn.sendall(str(response).encode())
             except Exception as e:
