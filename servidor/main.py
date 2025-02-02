@@ -97,7 +97,14 @@ class ClientHandler(Thread):
                 break
 
         print(f"Cliente {self.addr} desconectado.")
+        self.remove_from_ranking()
         self.conn.close()
+
+    def remove_from_ranking(self):
+        """Remove o nickname e o score do ranking quando o cliente se desconecta."""
+        global rankings
+        rankings = [(name, score) for name, score in rankings if name != self.nickname]
+        print(f"Ranking atualizado após desconexão de {self.nickname}: {rankings}")
 
 # Inicia o servidor
 def start_server():
