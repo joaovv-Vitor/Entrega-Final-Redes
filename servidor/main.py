@@ -9,26 +9,78 @@ PORT = 5000         # Porta do servidor
 
 # Configurações do tabuleiro
 ROWS, COLS = 10, 10
-WORDS = ["PYTHON", "JOGO", "PROGRAMA", "DIVERSÃO"]
+
+
+#sortear palavras
+bancoPalavras = [
+    "AMOR", "CASA", "FELIZ", "JOGO", "LIVRO", "MUNDO", "TEMPO", "VIDA",
+    "SOL", "LUZ", "MAR", "RIO", "FLOR", "ÁRVORE", "PRAIA", "CAMPO",
+    "FUTURO", "PASSADO", "PRESENTE", "FAMÍLIA", "AMIGO", "ESCOLA", "TRABALHO"
+]
+
+WORDS = random.sample(bancoPalavras, 5)
+
 
 # Lista para armazenar os rankings (nickname, score)
 rankings = []
 
 # Função para gerar o tabuleiro
 def generate_board():
-    board = [[random.choice(string.ascii_uppercase) for _ in range(COLS)] for _ in range(ROWS)]
-    for word in WORDS:
-        direction = random.choice(["horizontal", "vertical"])
+    # Inicializa o tabuleiro com espaços vazios
+    board = [[' ' for _ in range(COLS)] for _ in range(ROWS)]
+    
+    # Função para verificar se uma palavra pode ser colocada em uma determinada posição
+    def can_place_word(word, row, col, direction):
         if direction == "horizontal":
-            row = random.randint(0, ROWS - 1)
-            col = random.randint(0, COLS - len(word))
-            for i, letter in enumerate(word):
-                board[row][col + i] = letter
+            if col + len(word) > COLS:
+                return False
+            for i in range(len(word)):
+                if board[row][col + i] != ' ' and board[row][col + i] != word[i]:
+                    return False
         elif direction == "vertical":
-            row = random.randint(0, ROWS - len(word))
-            col = random.randint(0, COLS - 1)
-            for i, letter in enumerate(word):
-                board[row + i][col] = letter
+            if row + len(word) > ROWS:
+                return False
+            for i in range(len(word)):
+                if board[row + i][col] != ' ' and board[row + i][col] != word[i]:
+                    return False
+        return True
+    
+    # Função para colocar uma palavra no tabuleiro
+    def place_word(word, row, col, direction):
+        if direction == "horizontal":
+            for i in range(len(word)):
+                board[row][col + i] = word[i]
+        elif direction == "vertical":
+            for i in range(len(word)):
+                board[row + i][col] = word[i]
+    
+    # Coloca as palavras no tabuleiro
+    for word in WORDS:
+        placed = False
+        attempts = 0
+        while not placed and attempts < 1000:
+            direction = random.choice(["horizontal", "vertical"])
+            if direction == "horizontal":
+                row = random.randint(0, ROWS - 1)
+                col = random.randint(0, COLS - len(word))
+            elif direction == "vertical":
+                row = random.randint(0, ROWS - len(word))
+                col = random.randint(0, COLS - 1)
+            
+            if can_place_word(word, row, col, direction):
+                place_word(word, row, col, direction)
+                placed = True
+            attempts += 1
+        
+        if not placed:
+            raise ValueError(f"Não foi possível colocar a palavra: {word}")
+    
+    # Preenche os espaços vazios com letras aleatórias
+    for row in range(ROWS):
+        for col in range(COLS):
+            if board[row][col] == ' ':
+                board[row][col] = random.choice(string.ascii_uppercase)
+    
     return board
 
 # Classe para gerenciar cada cliente
@@ -43,6 +95,7 @@ class ClientHandler(Thread):
         self.nickname = None   # Nickname do jogador
 
     def run(self):
+        #print(WORDS)
         print(f"Novo cliente conectado: {self.addr}")
 
         # Solicita o nickname do cliente
@@ -115,7 +168,10 @@ def start_server():
 
         # Gera o tabuleiro (compartilhado entre todos os clientes)
         board = generate_board()
-        print("Tabuleiro gerado:", board)
+        print("Tabuleiro gerado:")
+        for row in board:
+            print(' '.join(row))
+        print(WORDS)
 
         while True:
             conn, addr = server_socket.accept()
