@@ -2,9 +2,10 @@ import socket
 import pygame
 import ast  # Para usar ast.literal_eval em vez de eval
 
-# Configurações do cliente
-HOST = '127.0.0.1'  # Endereço IP do servidor
-PORT = 5000         # Porta do servidor
+BROADCAST_PORT = 5001  # Porta usada para descoberta do servidor
+TCP_PORT = 5000        # Porta do servidor para conexão principal
+BROADCAST_MSG = "DISCOVERY_REQUEST"
+BUFFER_SIZE = 4096
 
 # Configurações da tela
 WIDTH, HEIGHT = 600, 640
@@ -26,6 +27,26 @@ pygame.display.set_caption("Caça-Palavras (Cliente)")
 font = pygame.font.SysFont(None, 25)
 header_font = pygame.font.SysFont(None, 35)
 
+
+def discover_server():
+    """Descobre automaticamente o IP do servidor usando broadcast UDP."""
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
+        udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        udp_socket.settimeout(3)  # Tempo limite para resposta do servidor
+
+        print("Procurando servidor...")
+        udp_socket.sendto(BROADCAST_MSG.encode(), ('<broadcast>', BROADCAST_PORT))
+        
+        try:
+            data, addr = udp_socket.recvfrom(1024)  # Espera resposta do servidor
+            if data.decode() == "DISCOVERY_RESPONSE":
+                print(f"Servidor encontrado em {addr[0]}")
+                return addr[0]
+        except socket.timeout:
+            print("Nenhuma resposta do servidor encontrada.")
+            return None
+
+
 def draw_board(board, selected_cells):
     for row in range(ROWS):
         for col in range(COLS):
@@ -35,10 +56,12 @@ def draw_board(board, selected_cells):
             screen.blit(text, (col * CELL_SIZE + 5, row * CELL_SIZE + 85))
             pygame.draw.rect(screen, BLACK, (col * CELL_SIZE, row * CELL_SIZE + 80, CELL_SIZE, CELL_SIZE), 1)
 
+
 def draw_header(score, found_words):
     header_text = f"Pontuação: {score}"
     text = header_font.render(header_text, True, BLACK)
     screen.blit(text, (10, 10))
+
 
 def draw_ranking(rankings):
     y_offset = 80  
@@ -49,6 +72,7 @@ def draw_ranking(rankings):
         text = font.render(ranking_text, True, BLACK)
         screen.blit(text, (x_offset, y_offset))
         y_offset += 20
+
 
 def get_nickname():
     input_box = pygame.Rect(150, 200, 300, 32)
@@ -93,6 +117,7 @@ def get_nickname():
 
     return nickname
 
+
 def draw_ranking_final(rankings):
     font = pygame.font.Font(None, 36)
     title_font = pygame.font.Font(None, 50)
@@ -108,19 +133,26 @@ def draw_ranking_final(rankings):
 
     pygame.display.flip()
 
+
 def main():
+    server_ip = discover_server()
+    if not server_ip:
+        print("Não foi possível encontrar o servidor. Verifique se o servidor está ativo e na mesma rede.")
+        return
+
     try:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as client_socket:
-            client_socket.connect((HOST, PORT))
-            print(f"Conectado ao servidor {HOST}:{PORT}")
+            print(f"Conectando ao servidor em {server_ip}:{TCP_PORT}...")
+            client_socket.connect((server_ip, TCP_PORT))
+            print("Conexão estabelecida com o servidor.")
 
-            client_socket.recv(1024).decode()
             nickname = get_nickname()
             if nickname is None:
                 return
-
+            client_socket.recv(4096).decode()
             client_socket.sendall(nickname.encode())
 
+            # Recebe o tabuleiro do servidor
             board_data = client_socket.recv(4096).decode()
             board = ast.literal_eval(board_data)  # Usando ast.literal_eval para segurança
             print("Tabuleiro recebido:", board)
@@ -189,10 +221,13 @@ def main():
                     except Exception as e:
                         print(f"Erro ao receber dados do servidor: {e}")
 
+    except ConnectionRefusedError:
+        print("Erro: Não foi possível conectar ao servidor. Verifique se o servidor está ativo.")
     except Exception as e:
         print(f"Erro ao conectar ao servidor: {e}")
     finally:
         pygame.quit()
+
 
 if __name__ == "__main__":
     main()
