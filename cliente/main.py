@@ -1,51 +1,45 @@
 import socket
 import pygame
-import ast  # Para usar ast.literal_eval em vez de eval
+import ast
 
-BROADCAST_PORT = 5001  # Porta usada para descoberta do servidor
-TCP_PORT = 5000        # Porta do servidor para conexão principal
+BROADCAST_PORT = 5001
+TCP_PORT = 5000
 BROADCAST_MSG = "DISCOVERY_REQUEST"
 BUFFER_SIZE = 4096
 
-# Configurações da tela
 WIDTH, HEIGHT = 600, 640
 CELL_SIZE = 40
 ROWS, COLS = 10, 10
 
-# Cores
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 GREEN = (0, 255, 0)
 RED = (200, 50, 50)
+GRAY = (200, 200, 200)
 
-# Inicializa o Pygame
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Caça-Palavras (Cliente)")
 
-# Fontes
 font = pygame.font.SysFont(None, 25)
 header_font = pygame.font.SysFont(None, 35)
 
-
 def discover_server():
-    """Descobre automaticamente o IP do servidor usando broadcast UDP."""
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as udp_socket:
         udp_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        udp_socket.settimeout(3)  # Tempo limite para resposta do servidor
+        udp_socket.settimeout(3)
 
         print("Procurando servidor...")
         udp_socket.sendto(BROADCAST_MSG.encode(), ('<broadcast>', BROADCAST_PORT))
         
         try:
-            data, addr = udp_socket.recvfrom(1024)  # Espera resposta do servidor
+            data, addr = udp_socket.recvfrom(1024)
             if data.decode() == "DISCOVERY_RESPONSE":
                 print(f"Servidor encontrado em {addr[0]}")
                 return addr[0]
         except socket.timeout:
             print("Nenhuma resposta do servidor encontrada.")
             return None
-
 
 def draw_board(board, selected_cells):
     for row in range(ROWS):
@@ -56,12 +50,10 @@ def draw_board(board, selected_cells):
             screen.blit(text, (col * CELL_SIZE + 5, row * CELL_SIZE + 85))
             pygame.draw.rect(screen, BLACK, (col * CELL_SIZE, row * CELL_SIZE + 80, CELL_SIZE, CELL_SIZE), 1)
 
-
 def draw_header(score, found_words):
     header_text = f"Pontuação: {score}"
     text = header_font.render(header_text, True, BLACK)
     screen.blit(text, (10, 10))
-
 
 def draw_ranking(rankings):
     y_offset = 80  
@@ -72,7 +64,6 @@ def draw_ranking(rankings):
         text = font.render(ranking_text, True, BLACK)
         screen.blit(text, (x_offset, y_offset))
         y_offset += 20
-
 
 def get_nickname():
     input_box = pygame.Rect(150, 200, 300, 32)
@@ -117,22 +108,36 @@ def get_nickname():
 
     return nickname
 
-
 def draw_ranking_final(rankings):
     font = pygame.font.Font(None, 36)
     title_font = pygame.font.Font(None, 50)
 
     screen.fill(WHITE)
 
+    # Título
     title_text = title_font.render("Ranking Final", True, BLACK)
     screen.blit(title_text, (WIDTH // 2 - title_text.get_width() // 2, 30))
 
+    # Desenha os rankings
     for i, (name, score) in enumerate(rankings, start=1):
         text = font.render(f"{i}. {name} - {score} pontos", True, RED if name == "Você" else BLACK)
         screen.blit(text, (WIDTH // 4, 100 + i * 40))
 
+    #Desenha o botão de reiniciar
+    restart_button_rect = pygame.Rect(WIDTH // 2 - 175, HEIGHT - 80, 150, 50)
+    pygame.draw.rect(screen, GRAY, restart_button_rect)
+    restart_button_text = font.render("Reiniciar", True, BLACK)
+    screen.blit(restart_button_text, (WIDTH // 2 - 175 + (150 - restart_button_text.get_width()) // 2, HEIGHT - 65))
+
+    # Desenha o botão de atualizar ranking
+    update_button_rect = pygame.Rect(WIDTH // 2 + 25, HEIGHT - 80, 150, 50)
+    pygame.draw.rect(screen, GRAY, update_button_rect)
+    update_button_text = font.render("Atualizar", True, BLACK)
+    screen.blit(update_button_text, (WIDTH // 2 + 25 + (150 - update_button_text.get_width()) // 2, HEIGHT - 65))
+
     pygame.display.flip()
 
+    return update_button_rect ,restart_button_rect
 
 def main():
     server_ip = discover_server()
@@ -152,9 +157,8 @@ def main():
             client_socket.recv(4096).decode()
             client_socket.sendall(nickname.encode())
 
-            # Recebe o tabuleiro do servidor
             board_data = client_socket.recv(4096).decode()
-            board = ast.literal_eval(board_data)  # Usando ast.literal_eval para segurança
+            board = ast.literal_eval(board_data)
             print("Tabuleiro recebido:", board)
 
             selected_cells = []
@@ -196,20 +200,33 @@ def main():
                             if score == 5:
                                 game_over = True
 
+                    elif event.type == pygame.MOUSEBUTTONDOWN and game_over:
+                        # if restart_button_rect.collidepoint(event.pos):
+                        #     print("Reiniciando tela...")
+                        #     rankings = [("Você", 0)]
+                        #     game_over = False
+                        #     selected_cells = []
+                        #     found_words = []
+                        #     score = 0
+                        if update_button_rect.collidepoint(event.pos):
+                            print("Atualizando ranking...")
+                            client_socket.sendall("update_ranking".encode())
+                            updated_rankings_data = client_socket.recv(1024).decode()
+                            rankings = ast.literal_eval(updated_rankings_data)
+                            print("Ranking atualizado:", rankings)
+
                 screen.fill(WHITE)
                 draw_header(score, found_words)
                 draw_board(board, selected_cells)
                 draw_ranking(rankings)
 
                 if game_over:
-                    draw_ranking_final(rankings)
+                    restart_button_rect, update_button_rect = draw_ranking_final(rankings)
 
                 pygame.display.flip()
 
-                # Continua recebendo atualizações do servidor mesmo após o jogo terminar
                 if game_over:
                     try:
-                        # Configura o socket para não bloquear (non-blocking)
                         client_socket.setblocking(False)
                         progress_data = client_socket.recv(1024).decode()
                         if progress_data:
@@ -217,7 +234,7 @@ def main():
                             rankings = progress["rankings"]
                             print("Ranking atualizado:", rankings)
                     except BlockingIOError:
-                        pass  # Não há dados disponíveis no socket
+                        pass
                     except Exception as e:
                         print(f"Erro ao receber dados do servidor: {e}")
 

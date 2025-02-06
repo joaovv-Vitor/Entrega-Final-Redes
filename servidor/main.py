@@ -92,6 +92,26 @@ def handle_discovery():
                 print(f"Recebida solicitação de descoberta de {addr}")
                 udp_socket.sendto("DISCOVERY_RESPONSE".encode(), addr)
 
+def update_ranking(nickname, score):
+    """Atualiza o ranking do jogador. Se já existir, atualiza a pontuação; senão, adiciona."""
+    global rankings
+    updated = False
+
+    # Percorre o ranking para atualizar a pontuação do jogador
+    for i, (name, old_score) in enumerate(rankings):
+        if name == nickname:
+            rankings[i] = (nickname, max(score, old_score))  # Mantém a maior pontuação
+            updated = True
+            break
+
+    # Se o jogador não estiver no ranking, adiciona
+    if not updated:
+        rankings.append((nickname, score))
+
+    # Ordena o ranking por pontuação (decrescente)
+    rankings.sort(key=lambda x: x[1], reverse=True)
+
+
 # Classe para gerenciar cada cliente
 class ClientHandler(Thread):
     def __init__(self, conn, addr, board):
@@ -120,6 +140,12 @@ class ClientHandler(Thread):
                 data = self.conn.recv(1024).decode()
                 if not data:
                     break
+
+                if data == "update_ranking":
+                    # Adiciona um delimitador no final para indicar fim da mensagem
+                    ranking_str = str(rankings[:10]) + "\n"
+                    self.conn.sendall(ranking_str.encode())
+                    continue
 
                 selected_cells = ast.literal_eval(data)  # Usando ast.literal_eval para segurança
                 print(f"Cliente {self.addr} selecionou: {selected_cells}")
@@ -153,6 +179,7 @@ class ClientHandler(Thread):
                     "rankings": rankings[:10]
                 }
                 self.conn.sendall(str(response).encode())
+
         except Exception as e:
             print(f"Erro com o cliente {self.addr}: {e}")
         finally:
@@ -179,6 +206,9 @@ def start_server():
         for row in board:
             print(' '.join(row))
         print("Palavras no tabuleiro:", WORDS)
+
+
+        
 
         # Inicia o servidor de descoberta UDP em uma thread separada
         discovery_thread = Thread(target=handle_discovery, daemon=True)
